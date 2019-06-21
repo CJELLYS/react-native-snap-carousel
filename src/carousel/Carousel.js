@@ -1,5 +1,5 @@
 import React, { Component } from 'react';
-import { Animated, Easing, FlatList, I18nManager, Platform, ScrollView, View, ViewPropTypes } from 'react-native';
+import { Animated, Easing, FlatList, I18nManager, Platform, ScrollView, View, ViewPropTypes ,PanResponder} from 'react-native';
 import PropTypes from 'prop-types';
 import shallowCompare from 'react-addons-shallow-compare';
 import {
@@ -155,10 +155,10 @@ export default class Carousel extends Component {
             console.warn('react-native-snap-carousel: It is recommended to use at least version 0.44 of React Native with the plugin');
         }
         if (!props.vertical && (!props.sliderWidth || !props.itemWidth)) {
-            console.error('react-native-snap-carousel: You need to specify both `sliderWidth` and `itemWidth` for horizontal carousels');
+            console.warn('react-native-snap-carousel: You need to specify both `sliderWidth` and `itemWidth` for horizontal carousels');
         }
         if (props.vertical && (!props.sliderHeight || !props.itemHeight)) {
-            console.error('react-native-snap-carousel: You need to specify both `sliderHeight` and `itemHeight` for vertical carousels');
+            console.warn('react-native-snap-carousel: You need to specify both `sliderHeight` and `itemHeight` for vertical carousels');
         }
         if (props.apparitionDelay && !IS_IOS && !props.useScrollView) {
             console.warn('react-native-snap-carousel: Using `apparitionDelay` on Android is not recommended since it can lead to rendering issues');
@@ -167,8 +167,33 @@ export default class Carousel extends Component {
             console.warn('react-native-snap-carousel: Props `customAnimationType` and `customAnimationOptions` have been renamed to `activeAnimationType` and `activeAnimationOptions`');
         }
         if (props.onScrollViewScroll) {
-            console.error('react-native-snap-carousel: Prop `onScrollViewScroll` has been removed. Use `onScroll` instead');
+            console.warn('react-native-snap-carousel: Prop `onScrollViewScroll` has been removed. Use `onScroll` instead');
         }
+
+        this._panResponder = {}
+        this.nextActiveItem = null
+    }
+   
+    componentWillMount() { 
+        this._panResponder = PanResponder.create({
+            onStartShouldSetPanResponder: (evt, gestureState) => true,
+            onStartShouldSetPanResponderCapture: (evt, gestureState) => true,
+            onMoveShouldSetPanResponder: (evt, gestureState) => truer,
+            onMoveShouldSetPanResponderCapture: (evt, gestureState) => true,
+            onPanResponderGrant: (evt, gestureState) => {
+                // 开始手势
+                this.startMoveEvent = evt.nativeEvent;
+            },
+            onPanResponderRelease: (evt, gestureState) => {
+                this.endMoveEvent = evt.nativeEvent
+                let timer = this.endMoveEvent.timestamp - this.startMoveEvent.timestamp
+                let offsetY = this.endMoveEvent
+                if (gestureState.dx <=3 && gestureState.dx>=-3) {
+                    this.props.onPressItem(this._getDataIndex(this.nextActiveItem));
+                    return
+                }
+            }
+        })
     }
 
     componentDidMount () {
@@ -759,12 +784,13 @@ export default class Carousel extends Component {
         }
     }
 
-    _onScroll (event) {
+    _onScroll(event) {
         const { callbackOffsetMargin, enableMomentum, onScroll } = this.props;
 
         const scrollOffset = event ? this._getScrollOffset(event) : this._currentContentOffset;
         const nextActiveItem = this._getActiveItem(scrollOffset);
         const itemReached = nextActiveItem === this._itemToSnapTo;
+        this.nextActiveItem = nextActiveItem
         const scrollConditions =
             scrollOffset >= this._scrollOffsetRef - callbackOffsetMargin &&
             scrollOffset <= this._scrollOffsetRef + callbackOffsetMargin;
@@ -1347,7 +1373,7 @@ export default class Carousel extends Component {
                 }
             </ScrollViewComponent>
         ) : (
-            <AnimatedFlatList {...props} />
+            <AnimatedFlatList {...props} {...this._panResponder.panHandlers} />
         );
     }
 }
